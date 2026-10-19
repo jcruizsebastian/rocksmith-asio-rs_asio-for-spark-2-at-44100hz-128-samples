@@ -1,12 +1,16 @@
 # Rocksmith ASIO (RS_ASIO) for Spark 2 at 44100Hz 128 samples
 
-Fork of [`RS_ASIO`](https://github.com/mdias/rs_asio) specifically engineered to use the **Positive Grid Spark 2 (50W)** (and **Spark 40**) as a low-latency USB ASIO audio interface in **`Rocksmith 2014 Edition - Remastered`** on Windows at **44100 Hz and 128 samples**.
+> ### 🙏 Credits & Acknowledgments
+> All credit for the core architecture and runtime patching of **[RS_ASIO](https://github.com/mdias/rs_asio)** goes to its original creator, **[Micael Dias (`mdias`)](https://github.com/mdias)**, and all [upstream contributors](https://github.com/mdias/rs_asio/graphs/contributors) who made low-latency ASIO possible in *Rocksmith 2014*. If you would like to support the original author's work, you can donate via [paypal.me/mdiasdonations](https://paypal.me/mdiasdonations).
+>
+> ### 🎯 Purpose of This Fork
+> This fork exists specifically to make the **Positive Grid Spark 2 (50W)** (and **Spark 40**) work seamlessly as a USB ASIO guitar interface in **`Rocksmith 2014 Edition - Remastered`** on Windows (**44100 Hz / 128 samples**) by adding real-time `44100 Hz ↔ 48000 Hz` cubic Hermite resampling, clean DI software pre-gain with anti-clipping protection, and ready-to-use configuration files.
 
 📦 **[Download Latest Release (`v0.7.5-spark2`)](https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest)**
 
 ---
 
-## Why is this fork needed for the Spark 2?
+## Technical Overview: Why is this fork needed for the Spark 2?
 
 `Rocksmith 2014` strictly requires audio interfaces to run at **48000 Hz** in exclusive mode, whereas the **Positive Grid Spark 2** USB ASIO driver is hardware-locked at **44100 Hz** and outputs its clean DI guitar signal with very conservative headroom (`~-27 dBFS`).
 
