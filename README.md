@@ -1,282 +1,187 @@
 # RS ASIO — Optimización para Positive Grid Spark 2 (44100 Hz / 128 Samples)
 
-> **Fork optimizado para Positive Grid Spark 2 en Windows (44100 Hz y buffer ASIO de 128 samples)**
->
-> El interfaz de audio USB del **Positive Grid Spark 2** funciona de forma fija a **44100 Hz**, mientras que `Rocksmith 2014 Edition - Remastered` exige **48000 Hz** exclusivos. Este fork está diseñado específicamente para trabajar a **128 samples** en el panel ASIO del driver de Spark 2 para Windows y añade:
-> - **Fallback automático a 44100 Hz** cuando el driver ASIO no soporta 48000 Hz nativamente.
-> - **Remuestreo en tiempo real de fase continua (`44100 Hz <-> 48000 Hz`)** mediante interpolación cúbica de Hermite de 4 puntos, pensado para un buffer ASIO de **128 samples en Windows** (~2,9 ms de latencia ASIO -> bloques de 139/140 muestras a 48000 Hz), logrando una detección de tono precisa en afinador, calibración y minijuegos (*Ducks Redux*, etc.).
-> - **Protección contra saturación (clipping)** en coma flotante y enteros de 24/32 bits al amplificar la señal limpia (DI) por software (`SoftwareMasterVolumePercent=2000`).
-> - **Medidor de nivel (`[InputMeter]`)** en `RS_ASIO-log.txt` para diagnosticar el pico real de entrada (`rawPeak` y `outPeak`).
->
-> 📦 **[Descargar última Release lista para Spark 2 (`v0.7.5-spark2`)](https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest)**
+Fork de [`RS_ASIO`](https://github.com/mdias/rs_asio) diseñado específicamente para utilizar el amplificador **Positive Grid Spark 2 (50W)** (y **Spark 40**) como interfaz de audio USB ASIO en **`Rocksmith 2014 Edition - Remastered`** sobre Windows.
 
-### Configuración recomendada para Positive Grid Spark 2 (50W) en Windows
-1. En el **Panel de Control ASIO de Positive Grid en Windows**, selecciona un **Buffer Size de `128 samples`** (`BufferSizeMode=driver`).
-2. En la app del **Spark 2**, desactiva todos los bloques del preset (`GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, `REVERB` en **OFF**) para enviar la señal **DI 100% limpia** por USB sin armónicos artificiales.
-3. En `RS_ASIO.ini` (ya incluido en la Release):
-   - `EnableWasapiOutputs=1` (para escuchar el juego por los altavoces/auriculares del PC) y `[Asio.Output] Driver=` vacío.
-   - En `[Asio.Input.0]`: `Driver=Positive Grid USB Audio Device`, `Channel=0` y `SoftwareMasterVolumePercent=2000`.
+📦 **[Descargar última Release (`v0.7.5-spark2`)](https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest)**
 
 ---
 
-This project aims to add ASIO support to `Rocksmith 2014 Edition - Remastered` in order to avoid issues with some WASAPI drivers.
-It patches game code at runtime to allow intervening in the process of WASAPI device enumeration so that we can inject our own fake WASAPI devices which internally use ASIO audio API.
+## ¿Qué soluciona este proyecto?
 
-## Other Languages
-[简体中文](README_CN.md) (Out of date)
+`Rocksmith 2014` exige que la interfaz de audio funcione a **48000 Hz** en modo exclusivo, pero el driver USB ASIO del **Positive Grid Spark 2** trabaja bloqueado a **44100 Hz** y entrega la señal limpia (DI) con un margen de grabación muy bajo (`-27 dBFS`).
 
-## How to use
+Esta versión resuelve todos esos problemas de raíz:
 
-- Copy the contents (`avrt.dll`, `RS_ASIO.dll`, `RS_ASIO.ini`) of [latest release](https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest) (zip archive) to the game folder.
-  - Only the Steam version of Rocksmith is currently supported. You can find local folder of a game by right clicking on a Rocksmith in your Steam library, and selecting menu "Manage" -> "Browse local files"
-- Modify the RS_ASIO.ini file to configure which ASIO driver to use, and which channels etc...
-- Look into [basic configuration guide](#basic-configuration-guide)
-- Make sure Rocksmith.ini is set to run with `ExclusiveMode=1` and `Win32UltraLowLatencyMode=1`. If in doubt, use default settings.
-- Make sure your game is set to use the RTC input instead of the microphone one. ([See this](https://github.com/mdias/rs_asio/issues/275#issuecomment-1120386256))
-- Make sure your interface clock is set to 48kHz. RS ASIO will try to request 48kHz mode, but your drivers may or may not allow this, so it might help setting it manually.
-- Make sure you're NOT using the NoCableLauncher or similar otherwise your instruments may not be detected properly.
-- Extra: An RS_ASIO-log.txt file is generated inside the game directory which may help discover your ASIO driver name and diagnose issues.
-    - IMPORTANT: Only 32-bit ASIO drivers will be detected!
-- Look into [list of knows issues](#known-issues) if you experience any problems
+1. **Fallback automático a `44100 Hz`**: Si el driver ASIO rechaza `48000 Hz`, `RS_ASIO` conmuta automáticamente a `44100 Hz`.
+2. **Remuestreo en tiempo real (`44100 Hz ↔ 48000 Hz`)**: Interpolación cúbica de Hermite de 4 puntos con fase continua (`step = 44100 / 48000 = 0.91875`), optimizada para un **buffer ASIO de `128 samples` en Windows** (~2,9 ms de latencia ASIO → bloques de 139/140 muestras a 48000 Hz). Garantiza detección de nota exacta en el afinador, en las 6 cuerdas y en minijuegos como *Ducks Redux*.
+3. **Ganancia limpia por software (`SoftwareMasterVolumePercent=2000`) con protección anti-clipping**: Amplifica `×20` la señal pura de las pastillas en coma flotante de 32 bits (llevando el pico de `-27 dBFS` al rango óptimo de calibración de Rocksmith sin saturar jamás gracias al limitador en `[-1.0, 1.0]`).
+4. **Medidor de señal (`[InputMeter]`) integrado**: Registra cada ~3 segundos en `RS_ASIO-log.txt` el pico real de entrada (`rawPeak`) y de salida (`outPeak`), eliminando además el spam de escritura en disco durante la calibración.
 
-### How to remove/uninstall
+---
 
-- Remove the custom DLL files from the game folder.
+## 1. Requisitos previos en Windows y en el Spark 2
 
-### Streaming while using RS ASIO
+Antes de abrir el juego, asegúrate de tener estos 3 ajustes:
 
-Check out [this guide](docs/streaming/README.md).
+1. **Driver ASIO de Positive Grid a `128 samples`**:
+   - Instala el driver oficial **Positive Grid USB Audio Device** para Windows.
+   - Abre el **Panel de Control ASIO de Positive Grid** y selecciona **`Buffer Size: 128 samples`**.
+2. **Señal limpia (DI) en el Spark 2**:
+   - En la app del Spark (o guardando un preset limpio en el ampli), **apaga todos los bloques**: `GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY` y `REVERB` en **OFF**.
+   - *¿Por qué?* El detector de notas de Rocksmith necesita la onda limpia de tus pastillas. Si dejas encendido el bloque `AMP` del Spark, los armónicos artificiales de la simulación de válvulas/altavoz engañan al detector de tono (haciendo que al pulsar el traste 1 dispare en el traste 11 o 12).
+3. **Volumen de la guitarra al máximo**:
+   - Sube la rueda de volumen de tu guitarra al 100%. (En el Spark 2 con el `AMP` apagado, las ruedas físicas `MASTER` / `OUTPUT` solo controlan el volumen que oyes en la habitación, no el nivel USB).
 
-### Using RS ASIO on linux
+---
 
-If you're using Ubuntu 12.04 LTS check [this page](docs/linux/ubuntu_1204_lts.md).
+## 2. Instalación
 
-Some people have had success using RS ASIO with [wineasio](https://www.wineasio.org/) on linux. You can check out [this issue](https://github.com/mdias/rs_asio/issues/99) for more information.
+### Opción A: Instalación automática con PowerShell (Recomendada)
 
-## Audio Interfaces reported to work well
+Abre **PowerShell** en Windows y ejecuta este comando de una sola línea (busca automáticamente dónde tienes instalado `Rocksmith 2014` en Steam, descarga la última Release de este repositorio y configura los archivos):
+
+```powershell
+irm https://raw.githubusercontent.com/jcruizsebastian/rs_asio-spark-2-44100hz/master/install.ps1 | iex
+```
 
 <details>
-<summary>Click to expand</summary>
+<summary>Ver el código completo del script de PowerShell (<code>install.ps1</code>)</summary>
 
-- [Alesis Core 1](https://github.com/mdias/rs_asio/issues/115)
-- [Antelope Audio Zen Go](https://github.com/mdias/rs_asio/issues/294#issuecomment-2212061137)
-- [Antelope Audio Zen Tour](https://github.com/mdias/rs_asio/issues/294)
-- [Arturia AudioFuse](https://github.com/mdias/rs_asio/issues/114)
-- [Arturia MiniFuse 1](https://github.com/mdias/rs_asio/issues/287)
-- [Arturia MiniFuse 2](https://github.com/mdias/rs_asio/issues/282)
-- [Asus Strix Soar](docs/asus_strix_soar/README.md)
-- [Audient Evo 4](docs/audient_evo_4/README.md)
-- [Audient Evo 16](docs/audient_evo_4/README.md)
-- [Audient iD14 Mk II](https://github.com/mdias/rs_asio/issues/553)
-- [Audient iD4](https://github.com/mdias/rs_asio/issues/295)
-- Audient iD22
-- [Avid Mbox Studio](https://github.com/mdias/rs_asio/issues/467)
-- [Behringer GUITAR 2 USB](https://github.com/mdias/rs_asio/issues/246), using ASIO4All
-- [Behringer MIC2 USB](docs/behringer_mic2usb/README.md), using ASIO4All
-- Behringer U-Phoria UM2  [(see this for more details)](https://github.com/mdias/rs_asio/issues/7) **IMPORTANT: needs legacy ASIO driver**
-- [Behringer UMC22](https://github.com/mdias/rs_asio/issues/326)  **IMPORTANT: needs legacy ASIO driver**
-- Behringer UMC1820
-- [Behringer UMC202HD](https://github.com/mdias/rs_asio/issues/610)
-- [Behringer UMC204](https://github.com/mdias/rs_asio/issues/156)
-- [Behringer UMC204HD](https://github.com/mdias/rs_asio/issues/161)
-- [Behringer UMC404HD](https://github.com/mdias/rs_asio/issues/13)
-- [Behringer XENIX Q502USB](https://github.com/mdias/rs_asio/issues/132) **IMPORTANT: needs legacy ASIO driver**
-- [Behringer XR18](https://github.com/mdias/rs_asio/issues/72)
-- [Blackstar BEAM Solo](https://github.com/mdias/rs_asio/issues/575)
-- [BOSS Gigcaster (GCS-8)](docs/boss_gcs_8/README.md)
-- [BOSS GT-1](https://github.com/mdias/rs_asio/issues/494)
-- [BOSS Katana-Air](https://github.com/mdias/rs_asio/issues/359)
-- [BOSS Katana MkII](docs/katana_mk2/README.md)
-- [Creative Live! Audio A3](https://github.com/mdias/rs_asio/issues/412)
-- [Creative Sound Blaster Z](https://github.com/mdias/rs_asio/issues/191)
-- [Darkglass Element](https://github.com/mdias/rs_asio/issues/258)
-- [Devine Centro 2i2o](https://github.com/mdias/rs_asio/issues/513#issuecomment-2733642765)
-- [Donner Livejack Lite 2 In 2 Out](https://github.com/mdias/rs_asio/issues/595)
-- ESI MAYA22 USB
-- [ESI MAYA44 eX](https://github.com/mdias/rs_asio/issues/134) [(Known issues)](#known-issues)
-- [ESI U22 XT](https://github.com/mdias/rs_asio/issues/458)
-- [ESI UGM96](https://github.com/mdias/rs_asio/issues/250) [(Known issues)](#known-issues)
-- [Fender Link I/O](https://github.com/mdias/rs_asio/issues/565)
-- [Fender Mustang Micro Plus](https://github.com/mdias/rs_asio/issues/558#issuecomment-3139856047)
-- [Focusrite Clarett 2Pre Thunderbolt](https://github.com/mdias/rs_asio/issues/146)
-- [Focusrite Clarett 4Pre USB](https://github.com/mdias/rs_asio/issues/42)
-- [Focusrite Clarett 8Pre USB](https://github.com/mdias/rs_asio/issues/158)
-- [Focusrite Saffire 6 USB 2.0](https://github.com/mdias/rs_asio/issues/116)
-- [Fifine Ampli1](/docs/fifine_ampli1/README.md), using ASIO4All
-- Focusrite Saffire Pro 40
-- [Focusrite Scarlett 2i2 1st Gen](https://github.com/mdias/rs_asio/issues/330) [(Known issues)](#known-issues)
-- [Focusrite Scarlett 2i2 2nd Gen](https://github.com/mdias/rs_asio/issues/126) [(Known issues)](#known-issues)
-- [Focusrite Scarlett 2i2 3rd Gen](https://github.com/mdias/rs_asio/issues/208) [(Known issues)](#known-issues)
-- [Focusrite Scarlett 2i2 4th Gen](https://github.com/mdias/rs_asio/issues/405#issuecomment-1876314996) [(Known issues)](#known-issues)
-- [Focusrite Scarlett 2i4 1st Gen](https://github.com/mdias/rs_asio/issues/133) [(Known issues)](#known-issues)
-- Focusrite Scarlett 2i4 2nd Gen [(Known issues)](#known-issues)
-- Focusrite Scarlett 4i4 3rd Gen [(Known issues)](#known-issues)
-- Focusrite Scarlett 6i6 2nd Gen [(Known issues)](#known-issues)
-- [Focusrite Scarlett 8i6 3rd Gen](https://github.com/mdias/rs_asio/issues/208) [(Known issues)](#known-issues)
-- [Focusrite Scarlett 16i16 4th Gen](https://github.com/mdias/rs_asio/issues/405#issuecomment-2527560680) [(Known issues)](#known-issues)
-- [Focusrite Scarlett 18i8 2nd Gen](docs/focusrite_scarlett_18i8_2nd_gen_OR_asio_link_pro/README.md) [(Known issues)](#known-issues)
-- Focusrite Scarlett 18i8 3rd Gen [(Known issues)](#known-issues)
-- Focusrite Scarlett 18i20 2nd Gen [(Known issues)](#known-issues)
-- [Focusrite Scarlett Solo 2nd Gen](docs/focusrite_solo_2-3/README.md) [(Known issues)](#known-issues)
-- [Focusrite Scarlett Solo 3rd Gen](docs/focusrite_solo_2-3/README.md) [(Known issues)](#known-issues)
-- [Focusrite Scarlett Solo 4th Gen](docs/focusrite_solo_4/README.md) [(Known issues)](#known-issues)
-- [Fractal Audio AXE FX III](https://github.com/mdias/rs_asio/issues/347)
-- [Hotone Ampero II Stage](https://github.com/mdias/rs_asio/issues/444)
-- [Hotone Ampero II Stomp](https://github.com/mdias/rs_asio/issues/444)
-- [Hotone Jogg](https://github.com/mdias/rs_asio/issues/533)
-- [IK Multimedia AXE I/O](https://github.com/mdias/rs_asio/issues/147)
-- [IK Multimedia AXE I/O ONE](https://github.com/mdias/rs_asio/issues/490)
-- [IK Multimedia iRig](https://github.com/mdias/rs_asio/issues/164), using ASIO4ALL
-- [IK Multimedia iRig HD 2](https://github.com/mdias/rs_asio/issues/117)
-- [IK Multimedia iRig HD X](https://github.com/mdias/rs_asio/issues/435)
-- [IK Multimedia iRig Pro Duo I/O](docs/irig_pro_duo_io/README.md)
-- [JackRouter ASIO driver](https://github.com/mdias/rs_asio/issues/303)
-- Juli@ XTe
-- Lexicon Alpha
-- [Line6 AMPLIFi 75](https://github.com/mdias/rs_asio/issues/97) **Some limitations apply. Follow the link for more information.**
-- [Line6 HX Stomp](https://github.com/mdias/rs_asio/issues/251)
-- [Line6 POD Go](https://github.com/mdias/rs_asio/pull/171)
-- M-Audio 2x2
-- [M-Audio AIR 192|4](https://github.com/mdias/rs_asio/issues/98)
-- [M-Audio Fast Track 2](https://github.com/mdias/rs_asio/issues/175)
-- [M-Audio Fast Track Pro USB](https://github.com/mdias/rs_asio/issues/225) (reporter had clock issues, check link)
-- [M-Audio Fast Track Ultra 8R](https://github.com/mdias/rs_asio/issues/135)
-- [M-Audio M-Track](https://github.com/mdias/rs_asio/issues/637), using ASIO4ALL
-- M-Audio M-Track Plus II
-- [M-Audio M-Track Solo](https://github.com/mdias/rs_asio/issues/207) NOTE: [there is a report](https://github.com/mdias/rs_asio/issues/562) that the 32-bit drivers are crashing
-- [M-Audio M-Track Duo](https://github.com/mdias/rs_asio/issues/207)
-- [M-Audio MobilePre mkII](https://github.com/mdias/rs_asio/issues/15)
-- [M-Audio ProFire 2626](https://github.com/mdias/rs_asio/issues/212#issuecomment-917706302)
-- [Mackie Big Knob Studio+](https://github.com/mdias/rs_asio/issues/385)
-- [Mackie Onyx 1620i](https://github.com/mdias/rs_asio/issues/239)
-- [Mackie Onyx Artist 1x2](https://github.com/mdias/rs_asio/issues/211)
-- [Mackie Onyx Producer 2x2](https://github.com/mdias/rs_asio/issues/211)
-- [Merging Anubis](https://github.com/mdias/rs_asio/issues/578)
-- [MIDIPLUS Studio S](docs/midiplus_studio_s/README.md)
-- [Miditech AUDIOLINK III](https://github.com/mdias/rs_asio/issues/512), using ASIO4ALL
-- [Mooer Steep I](https://github.com/mdias/rs_asio/issues/524), using WineASIO (Steam Deck + Proton 9.0)
-- [Monoprice Stage Right STi12](https://github.com/mdias/rs_asio/issues/357)
-- MOTU 2408 mk3
-- [MOTU M2](https://github.com/mdias/rs_asio/issues/151)
-- [MOTU M4](https://github.com/mdias/rs_asio/issues/240)
-- MOTU UltraLite AVB
-- [MOTU Ultralite mk4](https://github.com/mdias/rs_asio/issues/95)
-- [Native Instruments Audio Kontrol 1](https://github.com/mdias/rs_asio/issues/131)
-- [Native Instruments Komplete Audio 1](https://github.com/mdias/rs_asio/issues/118)
-- [Native Instruments Komplete Audio 2](https://github.com/mdias/rs_asio/issues/120)
-- Native Instruments Komplete Audio 6
-- [Native Instruments Rig Kontrol 2](https://github.com/mdias/rs_asio/issues/214)
-- [Native Instruments Rig Kontrol 3](https://github.com/mdias/rs_asio/issues/536)
-- [Neumann MT 48](https://github.com/mdias/rs_asio/issues/578)
-- [Neural DSP Nano Cortex](https://github.com/mdias/rs_asio/issues/529)
-- [Neural DSP Quad Cortex](https://github.com/mdias/rs_asio/issues/294)
-- [NUX Mighty Air](https://github.com/mdias/rs_asio/issues/364)
-- [NUX Mighty Lite BT MKII](https://github.com/mdias/rs_asio/issues/446)
-- [NUX Mighty Plug](https://github.com/mdias/rs_asio/issues/117)
-- [NUX Mighty Plug Pro](https://github.com/mdias/rs_asio/issues/117)
-- [NUX Mighty Space](https://github.com/mdias/rs_asio/issues/627)
-- [PositiveGrid Spark 40](https://github.com/mdias/rs_asio/issues/218) (issue reported with limited sample rate support in 2024/07; see linked issue)
-- [Presonus AudioBox Go](https://github.com/mdias/rs_asio/issues/606)
-- [Presonus AudioBox iTwo](https://github.com/mdias/rs_asio/issues/140)
-- [Presonus AudioBox USB 96](https://github.com/mdias/rs_asio/issues/140)
-- [Presonus ioStation 24c](https://github.com/mdias/rs_asio/issues/542)
-- Presonus Quantum 2
-- [Presonus Quantum ES 4](https://github.com/mdias/rs_asio/issues/496)
-- [Presonus Studio 24c](https://github.com/mdias/rs_asio/issues/280)
-- [Presonus StudioLive AR12c](https://github.com/mdias/rs_asio/issues/196)
-- ReaRoute ASIO (Reaper virtual ASIO router)
-- RME Babyface PRO
-- RME HDSPe AIO
-- RME Multiface with HDSPe PCIe
-- Roland Rubix 22
-- Roland Rubix 44
-- [Roland UA-1G](https://github.com/mdias/rs_asio/issues/291#issuecomment-1179084242)
-- [Roland ua55](docs/roland_ua_55/README.md)
-- [Roland V-Studio 100](https://github.com/mdias/rs_asio/issues/91)
-- [Røde AI-1](https://github.com/mdias/rs_asio/issues/339)
-- [Solid State Logic SSL12](https://github.com/mdias/rs_asio/issues/167)
-- [Solid State Logic SSL2+](https://github.com/mdias/rs_asio/issues/167)
-- [Solid State Logic SSL2+ MkII](https://github.com/mdias/rs_asio/issues/167#issuecomment-3352581100)
-- Sonicake Sonic Cube(Use channel 1 for input)
-- [SoundCraft Notepad-8FX](https://github.com/mdias/rs_asio/issues/86)
-- [SoundCraft Notepad-12FX](https://github.com/mdias/rs_asio/issues/86)
-- [SoundCraft Ui24R](https://github.com/mdias/rs_asio/issues/528)
-- Sound Devices MixPre-6 II
-- [Steinberg CI1](https://github.com/mdias/rs_asio/issues/268)
-- [Steinberg IXO12](https://github.com/mdias/rs_asio/issues/495)
-- [Steinberg MR816 CSX](https://github.com/mdias/rs_asio/issues/448)
-- [Steinberg UR12](docs/steinberg_ur12/README.md)
-- [Steinberg UR22](docs/steinberg_ur12/README.md)
-- [Steinberg UR22mkII](docs/steinberg_ur12/README.md)
-- [Steinberg UR22C](https://github.com/mdias/rs_asio/issues/124)
-- [Steinberg UR24C](https://github.com/mdias/rs_asio/issues/341)
-- [Steinberg UR44C](https://github.com/mdias/rs_asio/issues/130)
-- [Sterling Harmony H224](https://github.com/mdias/rs_asio/issues/390)
-- [SuZhou UTECK's Guitar-Cube Chord A](https://github.com/mdias/rs_asio/issues/92)
-- Swissonic UA-2x2
-- [TASCAM US-1200](https://github.com/mdias/rs_asio/issues/590)
-- [TASCAM US-1x2](https://github.com/mdias/rs_asio/issues/266)
-- [TASCAM US-4x4HR](https://github.com/mdias/rs_asio/issues/402)
-- [TC HELICON Blender](https://github.com/mdias/rs_asio/issues/407)
-- [Teyun Q22](https://github.com/mdias/rs_asio/issues/520), using ASIO4All
-- [Teyun Q24](https://github.com/mdias/rs_asio/issues/427), using ASIO4All
-- [Universal Audio Apollo Twin USB](https://github.com/mdias/rs_asio/issues/307) (requires older driver)
-- [Universal Audio Volt 1](docs/universal_audio_volt1/README.md)
-- [Universal Audio Volt 2 USB](https://github.com/mdias/rs_asio/issues/462)
-- [Universal Audio Volt 276](docs/universal_audio_volt_276/README.md)
-- [XTONE Smart Stomp](docs/xtone_smartstomp/README.md), using ASIO4All
-- [Yamaha AG06 USB Mixing Console](https://github.com/mdias/rs_asio/issues/81)
-- [Yamaha THR10II](https://github.com/mdias/rs_asio/issues/210)
-- [Yamaha THR30IIW](https://github.com/mdias/rs_asio/issues/210)
-- [Zoom AMS-22](https://github.com/mdias/rs_asio/issues/518)
-- [Zoom G2.1NU](https://github.com/mdias/rs_asio/issues/400)
-- [Zoom G2.1DM](https://github.com/mdias/rs_asio/issues/400)
-- Zoom H2N
-- [Zoom H6](https://github.com/mdias/rs_asio/issues/198)
-- [Zoom LiveTrak L-8](https://github.com/mdias/rs_asio/issues/584)
-- Zoom R24
-- [Zoom U-22](https://github.com/mdias/rs_asio/issues/179)
-- [Zoom U-44](https://github.com/mdias/rs_asio/issues/334)
-- Zoom UAC-2
-- [ZOOM UAC-232](https://github.com/mdias/rs_asio/issues/431)
+```powershell
+#Requires -Version 5.1
+$ErrorActionPreference = "Stop"
+
+if (Get-Process -Name "Rocksmith2014" -ErrorAction SilentlyContinue) {
+    Write-Host "[ERROR] Rocksmith 2014 está abierto. Ciérralo antes de continuar." -ForegroundColor Red
+    return
+}
+
+function Find-RocksmithPath {
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    foreach ($rp in @("HKLM:\SOFTWARE\WOW6432Node\Valve\Steam", "HKLM:\SOFTWARE\Valve\Steam", "HKCU:\Software\Valve\Steam")) {
+        if (Test-Path $rp) {
+            $props = Get-ItemProperty $rp -ErrorAction SilentlyContinue
+            if ($props.InstallPath) { $candidates.Add($props.InstallPath) }
+            if ($props.SteamPath)   { $candidates.Add(($props.SteamPath -replace '/', '\')) }
+        }
+    }
+    $candidates.Add("C:\Program Files (x86)\Steam")
+    $candidates.Add("C:\Program Files\Steam")
+
+    $steamLibs = [System.Collections.Generic.List[string]]::new()
+    foreach ($steamRoot in ($candidates | Select-Object -Unique)) {
+        if (Test-Path $steamRoot) {
+            $steamLibs.Add($steamRoot)
+            foreach ($vdf in @((Join-Path $steamRoot "steamapps\libraryfolders.vdf"), (Join-Path $steamRoot "config\libraryfolders.vdf"))) {
+                if (Test-Path $vdf) {
+                    Select-String -Path $vdf -Pattern '"path"\s+"([^"]+)"' -AllMatches | ForEach-Object {
+                        $_.Matches | ForEach-Object {
+                            $libPath = $_.Groups[1].Value -replace '\\\\', '\'
+                            if (Test-Path $libPath) { $steamLibs.Add($libPath) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+        $steamLibs.Add((Join-Path $_.Root "SteamLibrary"))
+        $steamLibs.Add((Join-Path $_.Root "Steam"))
+        $steamLibs.Add((Join-Path $_.Root "Program Files (x86)\Steam"))
+    }
+    foreach ($lib in ($steamLibs | Select-Object -Unique)) {
+        $rsDir = Join-Path $lib "steamapps\common\Rocksmith2014"
+        if (Test-Path (Join-Path $rsDir "Rocksmith2014.exe")) { return $rsDir }
+    }
+    return $null
+}
+
+$rsPath = Find-RocksmithPath
+if (-not $rsPath) {
+    $rsPath = Read-Host "Introduce la ruta completa a la carpeta de Rocksmith2014"
+}
+
+$releaseUrl = "https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest/download/RS_ASIO-v0.7.5-spark2-44100hz.zip"
+$tempZip = Join-Path $env:TEMP "RS_ASIO-spark2.zip"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Invoke-WebRequest -Uri $releaseUrl -OutFile $tempZip -UseBasicParsing
+Expand-Archive -Path $tempZip -DestinationPath $rsPath -Force
+Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
+Write-Host "¡Instalado correctamente en $rsPath!" -ForegroundColor Green
+```
 
 </details>
 
-### Basic configuration guide
+### Opción B: Instalación manual
 
-1. Follow installation steps, described [above](#how-to-use)
-1. Run Rocksmith for the first time.
-1. Look into `RS_ASIO-log.txt`, you will see names of drivers
+1. Descarga **`RS_ASIO-v0.7.5-spark2-44100hz.zip`** desde la sección **[Releases](https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest)**.
+2. En Steam, haz clic derecho sobre **Rocksmith 2014** → *Administrar* → *Ver archivos locales*.
+3. Extrae los 3 archivos (`RS_ASIO.dll`, `avrt.dll` y `RS_ASIO.ini`) directamente en la carpeta del juego (junto a `Rocksmith2014.exe`).
+4. Asegúrate de que en `Rocksmith.ini` estén activos `ExclusiveMode=1` y `Win32UltraLowLatencyMode=1`.
 
-```txt
-0.456 [INFO]  AsioHelpers::FindDrivers
-0.456 [INFO]    ASIO4ALL v2
-0.457 [INFO]    MOOER USB Audio
-0.457 [INFO]    XMOS USB Audio 2.0 ST 3086
-0.457 [INFO]    ZOOM R16_R24 ASIO Driver
+---
+
+## 3. Configuración incluida en `RS_ASIO.ini`
+
+El archivo `RS_ASIO.ini` de la Release ya viene preconfigurado con el modo híbrido óptimo (salida de audio por los altavoces/auriculares del PC mediante WASAPI a 48000 Hz, y entrada de guitarra por ASIO desde el Spark 2):
+
+```ini
+[Config]
+EnableWasapiOutputs=1
+EnableWasapiInputs=0
+EnableAsio=1
+
+[Asio]
+BufferSizeMode=driver
+CustomBufferSize=
+SampleRate=
+
+[Asio.Output]
+Driver=
+BaseChannel=0
+AltBaseChannel=
+EnableSoftwareEndpointVolumeControl=1
+EnableSoftwareMasterVolumeControl=1
+SoftwareMasterVolumePercent=100
+EnableRefCountHack=
+
+[Asio.Input.0]
+Driver=Positive Grid USB Audio Device
+Channel=0
+EnableSoftwareEndpointVolumeControl=1
+EnableSoftwareMasterVolumeControl=1
+SoftwareMasterVolumePercent=2000
+EnableRefCountHack=
 ```
 
-4. Copy name of the corresponding driver for the given device (such as `MOOER USB Audio` or `Focusrite USB ASIO`) to the `Driver` property of the `[Asio.Output]`, `[Asio.Input.0]`, `[Asio.Input.1]` and `[Asio.Input.Mic]` blocks of the `RS_ASIO.ini`
-1. Run Rocksmith again
-1. Repeat until there is no cracks in audio. Your goal is to have smallest possible values without cracks. Find smallest possible LatencyBuffer and then gradually set buffer size until there is no cracks.
-    1. Modify LatencyBuffer (try values 4,3,2,1)
-    1. Modify buffersize either in ASIO driver control panel or in `CustomBufferSize` option in the `RS_ASIO.ini` file. For the beginning follow rule of thumb that buffer size should be divisible to 32
-    1. Run Rocksmith
-    1. Look into `RS_ASIO-log.txt` if you experience any issues
+> **Nota**: Si prefieres escuchar el sonido del juego a través de los altavoces del propio **Spark 2** en lugar del PC, cambia `EnableWasapiOutputs=0` y pon `Driver=Positive Grid USB Audio Device` debajo de `[Asio.Output]`.
 
-### Known issues
+---
 
-- Your interface MUST support 48kHz playback
-- Doesn't provide a way to open the ASIO control panel (please configure your interface elsewhere for now, if needed).
-- Will need a game reboot if ASIO settings are changed while the game is running (such as changing sample rate, sample type etc).
-- Some Focusrite devices have been reported to only output sound properly when using ASIO buffer sizes of 48, 96 or 192.
-  - When `BufferSizeMode` is set to `driver` in `RS_ASIO.ini`'s `[Asio]` block, this only has to be set in the Focusrite Settings. When `BufferSizeMode` is set to `custom`, set `CustomBufferSize` to the same value.
-  - Changing your windows audio settings to use `2-channel, 24 bit, 48000 Hz (Studio Quality)` format [seems to help with achieving lower buffer sizes](https://github.com/mdias/rs_asio/issues/411).
-- [According to reports](https://github.com/mdias/rs_asio/issues?q=label%3A%22no%2032-bit%20ASIO%20driver%22), newer Focusrite driver releases (after 4.102.4) no longer include 32 bit ASIO drivers required by RS ASIO. You can work around this by using software like voicemeeter to reroute audio to the normal 64 bit drivers.
-- Some ESI ASIO drivers appear to get stuck when quitting Rocksmith, requiring unplugging the USB and plugging it again to be playable again.
-- Hardware hotplugging while the game is running won't be noticed by the game.
-- Game sometimes crash on exit with ASIO4ALL
+## 4. Puesta en marcha y diagnóstico (`RS_ASIO-log.txt`)
 
-## Donating
+1. Dentro de Rocksmith 2014, asegúrate de tener seleccionado el modo de entrada **Real Tone Cable** (no Micrófono).
+2. Entra en **Calibración** y sigue las instrucciones rasgueando las cuerdas.
+3. Si abres `RS_ASIO-log.txt` en la carpeta del juego, verás que:
+   - El driver arranca en modo remuestreo en tiempo real:
+     ```txt
+     ASIO running at 44100 Hz (host format is 48000 Hz - real-time resampling enabled)
+     {ASIO IN 0} Initialize - real-time resampling active: ASIO 44100Hz (128 frames) <-> Host 48000Hz (up to 140 frames)
+     ```
+   - La ganancia de calibración de Rocksmith (`fLevel`) se estabiliza cómodamente hacia la mitad de la escala (`fLevel ≈ 0.45 - 0.65`).
+   - Las líneas `[InputMeter]` muestran los picos de tu guitarra:
+     - En silencio: `rawPeak ≈ 0.00005` (`outPeak ≈ 0.0005`, `-66 dBFS`).
+     - Rasgueando fuerte: `outPeak ≈ 0.60 - 0.90` (fuerte y claro, sin llegar a `1.0`).
+   - **Ajuste fino según tus pastillas**:
+     - Si tu guitarra tiene pastillas de salida muy baja y en la calibración `fLevel` se queda clavado en `1`, sube `SoftwareMasterVolumePercent` a `2500` o `3000`.
+     - Si tu guitarra tiene pastillas activas muy potentes y `outPeak` llega a `1` constantemente, baja `SoftwareMasterVolumePercent` a `1200` o `1500`.
 
-If you wish to donate to the developer of this project, you can do so through [paypal.me/mdiasdonations](https://paypal.me/mdiasdonations). However opening an issue to say "thanks" would be enough.
+---
+
+## Desinstalación
+
+Para desinstalar `RS_ASIO`, simplemente elimina `RS_ASIO.dll`, `avrt.dll` y `RS_ASIO.ini` de la carpeta de `Rocksmith2014`.
+
+## Créditos
+
+Basado en el proyecto original **[RS_ASIO](https://github.com/mdias/rs_asio)** creado por **[mdias](https://github.com/mdias)** y colaboradores.
