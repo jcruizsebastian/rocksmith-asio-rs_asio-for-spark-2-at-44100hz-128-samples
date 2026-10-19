@@ -10,35 +10,7 @@
 
 ---
 
-## Technical Overview: Why is this fork needed for the Spark 2?
-
-`Rocksmith 2014` strictly requires audio interfaces to run at **48000 Hz** in exclusive mode, whereas the **Positive Grid Spark 2** USB ASIO driver is hardware-locked at **44100 Hz** and outputs its clean DI guitar signal with very conservative headroom (`~-27 dBFS`).
-
-This version solves those limitations out of the box:
-
-1. **Automatic `44100 Hz` Fallback**: When the ASIO driver rejects `48000 Hz`, `RS_ASIO` automatically falls back to `44100 Hz`.
-2. **Real-Time Continuous-Phase Resampling (`44100 Hz ↔ 48000 Hz`)**: Uses 4-point cubic Hermite interpolation (`step = 44100 / 48000 = 0.91875`), tuned for a **`128 samples` ASIO buffer on Windows** (~2.9 ms ASIO latency → 139/140-frame blocks at 48000 Hz). Ensures rock-solid pitch detection in the tuner, across all 6 strings, and in fret-sensitive minigames like *Ducks Redux*.
-3. **Clean Software Pre-Gain (`SoftwareMasterVolumePercent=2000`) with Anti-Clipping Protection**: Boosts the pure 32-bit floating-point pickup signal by `20x` (bringing the `-27 dBFS` Spark 2 DI peak right into Rocksmith's optimal calibration sweet spot while clamping to `[-1.0, 1.0]` to prevent integer wrap-around or harsh digital clipping).
-4. **Built-in Signal Peak Meter (`[InputMeter]`)**: Logs raw (`rawPeak`) and post-gain (`outPeak`) guitar peak levels every ~3 seconds in `RS_ASIO-log.txt` while suppressing repeated `SetMasterVolumeLevelScalar` disk-flush spam during calibration.
-
----
-
-## 1. Prerequisites (Windows & Spark 2)
-
-Before launching the game, verify these 3 settings:
-
-1. **Positive Grid Windows ASIO Driver set to `128 samples`**:
-   - Install the official **Positive Grid USB Audio Device** driver for Windows.
-   - Open the **Positive Grid ASIO Control Panel** in Windows and set **`Buffer Size: 128 samples`**.
-2. **Clean DI Signal on the Spark 2**:
-   - In the Spark mobile app (or by saving a clean hardware preset on the amp), **turn OFF all signal chain blocks**: `GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, and `REVERB`.
-   - *Why?* Rocksmith's pitch detector expects an unprocessed Direct Injection (DI) guitar signal (just like the official Real Tone Cable) and applies its own in-game amp modeling. Leaving the Spark's `AMP` block enabled introduces tube/cabinet harmonic overtones that trick Rocksmith into detecting notes an octave (+12 frets) higher.
-3. **Guitar Volume Knob at 100%**:
-   - Turn your guitar's physical volume knob all the way up. *(Note: when the `AMP` block is bypassed on the Spark 2, the physical `MASTER` / `OUTPUT` knobs on the amp only control room speaker volume and do not affect the USB audio send level).*
-
----
-
-## 2. Installation
+## 1. Installation
 
 ### Option A: Automatic PowerShell Installer (Recommended)
 
@@ -127,7 +99,35 @@ Write-Host "Successfully installed to $rsPath!" -ForegroundColor Green
 
 ---
 
-## 3. Included `RS_ASIO.ini` Configuration
+## 2. Required Settings (Windows & Spark 2)
+
+Before launching the game, verify these 3 settings:
+
+1. **Positive Grid Windows ASIO Driver set to `128 samples`**:
+   - Install the official **Positive Grid USB Audio Device** driver for Windows.
+   - Open the **Positive Grid ASIO Control Panel** in Windows and set **`Buffer Size: 128 samples`**.
+2. **Clean DI Signal on the Spark 2**:
+   - In the Spark mobile app (or by saving a clean hardware preset on the amp), **turn OFF all signal chain blocks**: `GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, and `REVERB`.
+   - *Why?* Rocksmith's pitch detector expects an unprocessed Direct Injection (DI) guitar signal (just like the official Real Tone Cable) and applies its own in-game amp modeling. Leaving the Spark's `AMP` block enabled introduces tube/cabinet harmonic overtones that trick Rocksmith into detecting notes an octave (+12 frets) higher.
+3. **Guitar Volume Knob at 100%**:
+   - Turn your guitar's physical volume knob all the way up. *(Note: when the `AMP` block is bypassed on the Spark 2, the physical `MASTER` / `OUTPUT` knobs on the amp only control room speaker volume and do not affect the USB audio send level).*
+
+---
+
+## 3. Technical Overview: Why is this fork needed for the Spark 2?
+
+`Rocksmith 2014` strictly requires audio interfaces to run at **48000 Hz** in exclusive mode, whereas the **Positive Grid Spark 2** USB ASIO driver is hardware-locked at **44100 Hz** and outputs its clean DI guitar signal with very conservative headroom (`~-27 dBFS`).
+
+This version solves those limitations out of the box:
+
+1. **Automatic `44100 Hz` Fallback**: When the ASIO driver rejects `48000 Hz`, `RS_ASIO` automatically falls back to `44100 Hz`.
+2. **Real-Time Continuous-Phase Resampling (`44100 Hz ↔ 48000 Hz`)**: Uses 4-point cubic Hermite interpolation (`step = 44100 / 48000 = 0.91875`), tuned for a **`128 samples` ASIO buffer on Windows** (~2.9 ms ASIO latency → 139/140-frame blocks at 48000 Hz). Ensures rock-solid pitch detection in the tuner, across all 6 strings, and in fret-sensitive minigames like *Ducks Redux*.
+3. **Clean Software Pre-Gain (`SoftwareMasterVolumePercent=2000`) with Anti-Clipping Protection**: Boosts the pure 32-bit floating-point pickup signal by `20x` (bringing the `-27 dBFS` Spark 2 DI peak right into Rocksmith's optimal calibration sweet spot while clamping to `[-1.0, 1.0]` to prevent integer wrap-around or harsh digital clipping).
+4. **Built-in Signal Peak Meter (`[InputMeter]`)**: Logs raw (`rawPeak`) and post-gain (`outPeak`) guitar peak levels every ~3 seconds in `RS_ASIO-log.txt` while suppressing repeated `SetMasterVolumeLevelScalar` disk-flush spam during calibration.
+
+---
+
+## 4. Included `RS_ASIO.ini` Configuration
 
 The preconfigured `RS_ASIO.ini` included in the release uses the recommended hybrid setup (game audio output through your PC speakers/headphones via WASAPI at 48000 Hz, and low-latency guitar input via ASIO from the Spark 2):
 
@@ -164,7 +164,7 @@ EnableRefCountHack=
 
 ---
 
-## 4. In-Game Setup & Diagnostics (`RS_ASIO-log.txt`)
+## 5. In-Game Setup & Diagnostics (`RS_ASIO-log.txt`)
 
 1. Launch Rocksmith 2014 and make sure your input mode is set to **Real Tone Cable** (not Microphone).
 2. Run **Calibration** inside the game.
@@ -187,7 +187,3 @@ EnableRefCountHack=
 ## Uninstallation
 
 To remove `RS_ASIO`, simply delete `RS_ASIO.dll`, `avrt.dll`, and `RS_ASIO.ini` from your `Rocksmith2014` folder.
-
-## Credits
-
-Based on the original **[RS_ASIO](https://github.com/mdias/rs_asio)** project created by **[mdias](https://github.com/mdias)** and contributors.
