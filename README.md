@@ -1,8 +1,8 @@
-# RS ASIO — Optimización para Positive Grid Spark 2 (44100 Hz / 128 Samples)
+# Rocksmith ASIO (RS_ASIO) for Spark 2 at 44100Hz 128 samples
 
-Fork de [`RS_ASIO`](https://github.com/mdias/rs_asio) diseñado específicamente para utilizar el amplificador **Positive Grid Spark 2 (50W)** (y **Spark 40**) como interfaz de audio USB ASIO en **`Rocksmith 2014 Edition - Remastered`** sobre Windows.
+Fork de [`RS_ASIO`](https://github.com/mdias/rs_asio) diseñado específicamente para utilizar el amplificador **Positive Grid Spark 2 (50W)** (y **Spark 40**) como interfaz de audio USB ASIO en **`Rocksmith 2014 Edition - Remastered`** sobre Windows a **44100 Hz y 128 samples**.
 
-📦 **[Descargar última Release (`v0.7.5-spark2`)](https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest)**
+📦 **[Descargar última Release (`v0.7.5-spark2`)](https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest)**
 
 ---
 
@@ -41,7 +41,7 @@ Antes de abrir el juego, asegúrate de tener estos 3 ajustes:
 Abre **PowerShell** en Windows y ejecuta este comando de una sola línea (busca automáticamente dónde tienes instalado `Rocksmith 2014` en Steam, descarga la última Release de este repositorio y configura los archivos):
 
 ```powershell
-irm https://raw.githubusercontent.com/jcruizsebastian/rs_asio-spark-2-44100hz/master/install.ps1 | iex
+irm https://raw.githubusercontent.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/master/install.ps1 | iex
 ```
 
 <details>
@@ -101,7 +101,7 @@ if (-not $rsPath) {
     $rsPath = Read-Host "Introduce la ruta completa a la carpeta de Rocksmith2014"
 }
 
-$releaseUrl = "https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest/download/RS_ASIO-v0.7.5-spark2-44100hz.zip"
+$releaseUrl = "https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest/download/RS_ASIO-v0.7.5-spark2-44100hz.zip"
 $tempZip = Join-Path $env:TEMP "RS_ASIO-spark2.zip"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Invoke-WebRequest -Uri $releaseUrl -OutFile $tempZip -UseBasicParsing
@@ -114,7 +114,7 @@ Write-Host "¡Instalado correctamente en $rsPath!" -ForegroundColor Green
 
 ### Opción B: Instalación manual
 
-1. Descarga **`RS_ASIO-v0.7.5-spark2-44100hz.zip`** desde la sección **[Releases](https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest)**.
+1. Descarga **`RS_ASIO-v0.7.5-spark2-44100hz.zip`** desde la sección **[Releases](https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest)**.
 2. En Steam, haz clic derecho sobre **Rocksmith 2014** → *Administrar* → *Ver archivos locales*.
 3. Extrae los 3 archivos (`RS_ASIO.dll`, `avrt.dll` y `RS_ASIO.ini`) directamente en la carpeta del juego (junto a `Rocksmith2014.exe`).
 4. Asegúrate de que en `Rocksmith.ini` estén activos `ExclusiveMode=1` y `Win32UltraLowLatencyMode=1`.

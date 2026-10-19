@@ -86,7 +86,7 @@ Write-Host "[OK] Carpeta de Rocksmith 2014 encontrada en:" -ForegroundColor Gree
 Write-Host "     $rsPath" -ForegroundColor White
 
 # 3. Descargar la última Release desde GitHub y extraer los ficheros
-$releaseUrl = "https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest/download/RS_ASIO-v0.7.5-spark2-44100hz.zip"
+$releaseUrl = "https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest/download/RS_ASIO-v0.7.5-spark2-44100hz.zip"
 $tempZip = Join-Path $env:TEMP "RS_ASIO-spark2.zip"
 
 Write-Host "[..] Descargando última versión desde GitHub Releases..." -ForegroundColor Cyan
