@@ -1,4 +1,22 @@
-# RS ASIO
+# RS ASIO — Optimización para Positive Grid Spark 2 (44100 Hz)
+
+> **Fork optimizado para Positive Grid Spark 2 (y dispositivos ASIO bloqueados a 44100 Hz)**
+>
+> El interfaz de audio USB del **Positive Grid Spark 2** funciona de forma fija a **44100 Hz**, mientras que `Rocksmith 2014 Edition - Remastered` exige **48000 Hz** exclusivos. Este fork añade:
+> - **Fallback automático a 44100 Hz** cuando el driver ASIO no soporta 48000 Hz natively.
+> - **Remuestreo en tiempo real de fase continua (`44100 Hz <-> 48000 Hz`)** mediante interpolación cúbica de Hermite de 4 puntos, manteniendo latencia ultrabaja (128 muestras ASIO / ~2 ms) y detección de tono precisa en afinador, calibración y minijuegos (*Ducks Redux*, etc.).
+> - **Protección contra saturación (clipping)** en coma flotante y enteros de 24/32 bits al amplificar la señal limpia (DI) por software (`SoftwareMasterVolumePercent=2000`).
+> - **Medidor de nivel (`[InputMeter]`)** en `RS_ASIO-log.txt` para diagnosticar el pico real de entrada (`rawPeak` y `outPeak`).
+>
+> 📦 **[Descargar última Release lista para Spark 2 (`v0.7.5-spark2`)](https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest)**
+
+### Configuración recomendada para Positive Grid Spark 2 (50W)
+1. En la app del **Spark 2**, desactiva todos los bloques del preset (`GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, `REVERB` en **OFF**) para enviar la señal **DI 100% limpia** por USB sin armónicos artificiales.
+2. En `RS_ASIO.ini` (ya incluido en la Release):
+   - `EnableWasapiOutputs=1` (para escuchar el juego por los altavoces/auriculares del PC) y `[Asio.Output] Driver=` vacío.
+   - En `[Asio.Input.0]`: `Driver=Positive Grid USB Audio Device`, `Channel=0` y `SoftwareMasterVolumePercent=2000`.
+
+---
 
 This project aims to add ASIO support to `Rocksmith 2014 Edition - Remastered` in order to avoid issues with some WASAPI drivers.
 It patches game code at runtime to allow intervening in the process of WASAPI device enumeration so that we can inject our own fake WASAPI devices which internally use ASIO audio API.
@@ -8,7 +26,7 @@ It patches game code at runtime to allow intervening in the process of WASAPI de
 
 ## How to use
 
-- Copy the contents (`avrt.dll`, `RS_ASIO.dll`, `RS_ASIO.ini`) of [latest release](https://github.com/mdias/rs_asio/releases/latest) (zip archive release-xxx.zip) to the game folder.
+- Copy the contents (`avrt.dll`, `RS_ASIO.dll`, `RS_ASIO.ini`) of [latest release](https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest) (zip archive) to the game folder.
   - Only the Steam version of Rocksmith is currently supported. You can find local folder of a game by right clicking on a Rocksmith in your Steam library, and selecting menu "Manage" -> "Browse local files"
 - Modify the RS_ASIO.ini file to configure which ASIO driver to use, and which channels etc...
 - Look into [basic configuration guide](#basic-configuration-guide)
