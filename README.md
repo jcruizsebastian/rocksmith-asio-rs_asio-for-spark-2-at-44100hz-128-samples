@@ -1,18 +1,19 @@
-# RS ASIO — Optimización para Positive Grid Spark 2 (44100 Hz)
+# RS ASIO — Optimización para Positive Grid Spark 2 (44100 Hz / 128 Samples)
 
-> **Fork optimizado para Positive Grid Spark 2 (y dispositivos ASIO bloqueados a 44100 Hz)**
+> **Fork optimizado para Positive Grid Spark 2 en Windows (44100 Hz y buffer ASIO de 128 samples)**
 >
-> El interfaz de audio USB del **Positive Grid Spark 2** funciona de forma fija a **44100 Hz**, mientras que `Rocksmith 2014 Edition - Remastered` exige **48000 Hz** exclusivos. Este fork añade:
-> - **Fallback automático a 44100 Hz** cuando el driver ASIO no soporta 48000 Hz natively.
-> - **Remuestreo en tiempo real de fase continua (`44100 Hz <-> 48000 Hz`)** mediante interpolación cúbica de Hermite de 4 puntos, manteniendo latencia ultrabaja (128 muestras ASIO / ~2 ms) y detección de tono precisa en afinador, calibración y minijuegos (*Ducks Redux*, etc.).
+> El interfaz de audio USB del **Positive Grid Spark 2** funciona de forma fija a **44100 Hz**, mientras que `Rocksmith 2014 Edition - Remastered` exige **48000 Hz** exclusivos. Este fork está diseñado específicamente para trabajar a **128 samples** en el panel ASIO del driver de Spark 2 para Windows y añade:
+> - **Fallback automático a 44100 Hz** cuando el driver ASIO no soporta 48000 Hz nativamente.
+> - **Remuestreo en tiempo real de fase continua (`44100 Hz <-> 48000 Hz`)** mediante interpolación cúbica de Hermite de 4 puntos, pensado para un buffer ASIO de **128 samples en Windows** (~2,9 ms de latencia ASIO -> bloques de 139/140 muestras a 48000 Hz), logrando una detección de tono precisa en afinador, calibración y minijuegos (*Ducks Redux*, etc.).
 > - **Protección contra saturación (clipping)** en coma flotante y enteros de 24/32 bits al amplificar la señal limpia (DI) por software (`SoftwareMasterVolumePercent=2000`).
 > - **Medidor de nivel (`[InputMeter]`)** en `RS_ASIO-log.txt` para diagnosticar el pico real de entrada (`rawPeak` y `outPeak`).
 >
 > 📦 **[Descargar última Release lista para Spark 2 (`v0.7.5-spark2`)](https://github.com/jcruizsebastian/rs_asio-spark-2-44100hz/releases/latest)**
 
-### Configuración recomendada para Positive Grid Spark 2 (50W)
-1. En la app del **Spark 2**, desactiva todos los bloques del preset (`GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, `REVERB` en **OFF**) para enviar la señal **DI 100% limpia** por USB sin armónicos artificiales.
-2. En `RS_ASIO.ini` (ya incluido en la Release):
+### Configuración recomendada para Positive Grid Spark 2 (50W) en Windows
+1. En el **Panel de Control ASIO de Positive Grid en Windows**, selecciona un **Buffer Size de `128 samples`** (`BufferSizeMode=driver`).
+2. En la app del **Spark 2**, desactiva todos los bloques del preset (`GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, `REVERB` en **OFF**) para enviar la señal **DI 100% limpia** por USB sin armónicos artificiales.
+3. En `RS_ASIO.ini` (ya incluido en la Release):
    - `EnableWasapiOutputs=1` (para escuchar el juego por los altavoces/auriculares del PC) y `[Asio.Output] Driver=` vacío.
    - En `[Asio.Input.0]`: `Driver=Positive Grid USB Audio Device`, `Channel=0` y `SoftwareMasterVolumePercent=2000`.
 
