@@ -1,58 +1,59 @@
 # Rocksmith ASIO (RS_ASIO) for Spark 2 at 44100Hz 128 samples
 
-Fork de [`RS_ASIO`](https://github.com/mdias/rs_asio) diseñado específicamente para utilizar el amplificador **Positive Grid Spark 2 (50W)** (y **Spark 40**) como interfaz de audio USB ASIO en **`Rocksmith 2014 Edition - Remastered`** sobre Windows a **44100 Hz y 128 samples**.
+Fork of [`RS_ASIO`](https://github.com/mdias/rs_asio) specifically engineered to use the **Positive Grid Spark 2 (50W)** (and **Spark 40**) as a low-latency USB ASIO audio interface in **`Rocksmith 2014 Edition - Remastered`** on Windows at **44100 Hz and 128 samples**.
 
-📦 **[Descargar última Release (`v0.7.5-spark2`)](https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest)**
-
----
-
-## ¿Qué soluciona este proyecto?
-
-`Rocksmith 2014` exige que la interfaz de audio funcione a **48000 Hz** en modo exclusivo, pero el driver USB ASIO del **Positive Grid Spark 2** trabaja bloqueado a **44100 Hz** y entrega la señal limpia (DI) con un margen de grabación muy bajo (`-27 dBFS`).
-
-Esta versión resuelve todos esos problemas de raíz:
-
-1. **Fallback automático a `44100 Hz`**: Si el driver ASIO rechaza `48000 Hz`, `RS_ASIO` conmuta automáticamente a `44100 Hz`.
-2. **Remuestreo en tiempo real (`44100 Hz ↔ 48000 Hz`)**: Interpolación cúbica de Hermite de 4 puntos con fase continua (`step = 44100 / 48000 = 0.91875`), optimizada para un **buffer ASIO de `128 samples` en Windows** (~2,9 ms de latencia ASIO → bloques de 139/140 muestras a 48000 Hz). Garantiza detección de nota exacta en el afinador, en las 6 cuerdas y en minijuegos como *Ducks Redux*.
-3. **Ganancia limpia por software (`SoftwareMasterVolumePercent=2000`) con protección anti-clipping**: Amplifica `×20` la señal pura de las pastillas en coma flotante de 32 bits (llevando el pico de `-27 dBFS` al rango óptimo de calibración de Rocksmith sin saturar jamás gracias al limitador en `[-1.0, 1.0]`).
-4. **Medidor de señal (`[InputMeter]`) integrado**: Registra cada ~3 segundos en `RS_ASIO-log.txt` el pico real de entrada (`rawPeak`) y de salida (`outPeak`), eliminando además el spam de escritura en disco durante la calibración.
+📦 **[Download Latest Release (`v0.7.5-spark2`)](https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest)**
 
 ---
 
-## 1. Requisitos previos en Windows y en el Spark 2
+## Why is this fork needed for the Spark 2?
 
-Antes de abrir el juego, asegúrate de tener estos 3 ajustes:
+`Rocksmith 2014` strictly requires audio interfaces to run at **48000 Hz** in exclusive mode, whereas the **Positive Grid Spark 2** USB ASIO driver is hardware-locked at **44100 Hz** and outputs its clean DI guitar signal with very conservative headroom (`~-27 dBFS`).
 
-1. **Driver ASIO de Positive Grid a `128 samples`**:
-   - Instala el driver oficial **Positive Grid USB Audio Device** para Windows.
-   - Abre el **Panel de Control ASIO de Positive Grid** y selecciona **`Buffer Size: 128 samples`**.
-2. **Señal limpia (DI) en el Spark 2**:
-   - En la app del Spark (o guardando un preset limpio en el ampli), **apaga todos los bloques**: `GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY` y `REVERB` en **OFF**.
-   - *¿Por qué?* El detector de notas de Rocksmith necesita la onda limpia de tus pastillas. Si dejas encendido el bloque `AMP` del Spark, los armónicos artificiales de la simulación de válvulas/altavoz engañan al detector de tono (haciendo que al pulsar el traste 1 dispare en el traste 11 o 12).
-3. **Volumen de la guitarra al máximo**:
-   - Sube la rueda de volumen de tu guitarra al 100%. (En el Spark 2 con el `AMP` apagado, las ruedas físicas `MASTER` / `OUTPUT` solo controlan el volumen que oyes en la habitación, no el nivel USB).
+This version solves those limitations out of the box:
+
+1. **Automatic `44100 Hz` Fallback**: When the ASIO driver rejects `48000 Hz`, `RS_ASIO` automatically falls back to `44100 Hz`.
+2. **Real-Time Continuous-Phase Resampling (`44100 Hz ↔ 48000 Hz`)**: Uses 4-point cubic Hermite interpolation (`step = 44100 / 48000 = 0.91875`), tuned for a **`128 samples` ASIO buffer on Windows** (~2.9 ms ASIO latency → 139/140-frame blocks at 48000 Hz). Ensures rock-solid pitch detection in the tuner, across all 6 strings, and in fret-sensitive minigames like *Ducks Redux*.
+3. **Clean Software Pre-Gain (`SoftwareMasterVolumePercent=2000`) with Anti-Clipping Protection**: Boosts the pure 32-bit floating-point pickup signal by `20x` (bringing the `-27 dBFS` Spark 2 DI peak right into Rocksmith's optimal calibration sweet spot while clamping to `[-1.0, 1.0]` to prevent integer wrap-around or harsh digital clipping).
+4. **Built-in Signal Peak Meter (`[InputMeter]`)**: Logs raw (`rawPeak`) and post-gain (`outPeak`) guitar peak levels every ~3 seconds in `RS_ASIO-log.txt` while suppressing repeated `SetMasterVolumeLevelScalar` disk-flush spam during calibration.
 
 ---
 
-## 2. Instalación
+## 1. Prerequisites (Windows & Spark 2)
 
-### Opción A: Instalación automática con PowerShell (Recomendada)
+Before launching the game, verify these 3 settings:
 
-Abre **PowerShell** en Windows y ejecuta este comando de una sola línea (busca automáticamente dónde tienes instalado `Rocksmith 2014` en Steam, descarga la última Release de este repositorio y configura los archivos):
+1. **Positive Grid Windows ASIO Driver set to `128 samples`**:
+   - Install the official **Positive Grid USB Audio Device** driver for Windows.
+   - Open the **Positive Grid ASIO Control Panel** in Windows and set **`Buffer Size: 128 samples`**.
+2. **Clean DI Signal on the Spark 2**:
+   - In the Spark mobile app (or by saving a clean hardware preset on the amp), **turn OFF all signal chain blocks**: `GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, and `REVERB`.
+   - *Why?* Rocksmith's pitch detector expects an unprocessed Direct Injection (DI) guitar signal (just like the official Real Tone Cable) and applies its own in-game amp modeling. Leaving the Spark's `AMP` block enabled introduces tube/cabinet harmonic overtones that trick Rocksmith into detecting notes an octave (+12 frets) higher.
+3. **Guitar Volume Knob at 100%**:
+   - Turn your guitar's physical volume knob all the way up. *(Note: when the `AMP` block is bypassed on the Spark 2, the physical `MASTER` / `OUTPUT` knobs on the amp only control room speaker volume and do not affect the USB audio send level).*
+
+---
+
+## 2. Installation
+
+### Option A: Automatic PowerShell Installer (Recommended)
+
+Open **PowerShell** on Windows and run this single command. It automatically locates your `Rocksmith 2014` Steam installation folder across all drives, downloads the latest release from this repository, and installs the files:
 
 ```powershell
 irm https://raw.githubusercontent.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/master/install.ps1 | iex
 ```
 
 <details>
-<summary>Ver el código completo del script de PowerShell (<code>install.ps1</code>)</summary>
+<summary>View full PowerShell installer script (<code>install.ps1</code>)</summary>
 
 ```powershell
 #Requires -Version 5.1
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 
 if (Get-Process -Name "Rocksmith2014" -ErrorAction SilentlyContinue) {
-    Write-Host "[ERROR] Rocksmith 2014 está abierto. Ciérralo antes de continuar." -ForegroundColor Red
+    Write-Host "[ERROR] Rocksmith 2014 is currently running. Please close it first." -ForegroundColor Red
     return
 }
 
@@ -84,10 +85,11 @@ function Find-RocksmithPath {
             }
         }
     }
-    Get-PSDrive -PSProvider FileSystem | ForEach-Object {
-        $steamLibs.Add((Join-Path $_.Root "SteamLibrary"))
-        $steamLibs.Add((Join-Path $_.Root "Steam"))
-        $steamLibs.Add((Join-Path $_.Root "Program Files (x86)\Steam"))
+    [System.IO.DriveInfo]::GetDrives() | Where-Object { $_.DriveType -eq 'Fixed' -and $_.IsReady } | ForEach-Object {
+        $root = $_.RootDirectory.FullName
+        $steamLibs.Add((Join-Path $root "SteamLibrary"))
+        $steamLibs.Add((Join-Path $root "Steam"))
+        $steamLibs.Add((Join-Path $root "Program Files (x86)\Steam"))
     }
     foreach ($lib in ($steamLibs | Select-Object -Unique)) {
         $rsDir = Join-Path $lib "steamapps\common\Rocksmith2014"
@@ -98,7 +100,7 @@ function Find-RocksmithPath {
 
 $rsPath = Find-RocksmithPath
 if (-not $rsPath) {
-    $rsPath = Read-Host "Introduce la ruta completa a la carpeta de Rocksmith2014"
+    $rsPath = Read-Host "Please enter the full path to your Rocksmith2014 folder"
 }
 
 $releaseUrl = "https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest/download/RS_ASIO-v0.7.5-spark2-44100hz.zip"
@@ -107,23 +109,23 @@ $tempZip = Join-Path $env:TEMP "RS_ASIO-spark2.zip"
 Invoke-WebRequest -Uri $releaseUrl -OutFile $tempZip -UseBasicParsing
 Expand-Archive -Path $tempZip -DestinationPath $rsPath -Force
 Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
-Write-Host "¡Instalado correctamente en $rsPath!" -ForegroundColor Green
+Write-Host "Successfully installed to $rsPath!" -ForegroundColor Green
 ```
 
 </details>
 
-### Opción B: Instalación manual
+### Option B: Manual Installation
 
-1. Descarga **`RS_ASIO-v0.7.5-spark2-44100hz.zip`** desde la sección **[Releases](https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest)**.
-2. En Steam, haz clic derecho sobre **Rocksmith 2014** → *Administrar* → *Ver archivos locales*.
-3. Extrae los 3 archivos (`RS_ASIO.dll`, `avrt.dll` y `RS_ASIO.ini`) directamente en la carpeta del juego (junto a `Rocksmith2014.exe`).
-4. Asegúrate de que en `Rocksmith.ini` estén activos `ExclusiveMode=1` y `Win32UltraLowLatencyMode=1`.
+1. Download **`RS_ASIO-v0.7.5-spark2-44100hz.zip`** from the **[Releases](https://github.com/jcruizsebastian/rocksmith-asio-rs_asio-for-spark-2-at-44100hz-128-samples/releases/latest)** page.
+2. In Steam, right-click **Rocksmith 2014** → *Manage* → *Browse local files*.
+3. Extract `RS_ASIO.dll`, `avrt.dll`, and `RS_ASIO.ini` directly into the game directory (next to `Rocksmith2014.exe`).
+4. Ensure `ExclusiveMode=1` and `Win32UltraLowLatencyMode=1` are set in `Rocksmith.ini`.
 
 ---
 
-## 3. Configuración incluida en `RS_ASIO.ini`
+## 3. Included `RS_ASIO.ini` Configuration
 
-El archivo `RS_ASIO.ini` de la Release ya viene preconfigurado con el modo híbrido óptimo (salida de audio por los altavoces/auriculares del PC mediante WASAPI a 48000 Hz, y entrada de guitarra por ASIO desde el Spark 2):
+The preconfigured `RS_ASIO.ini` included in the release uses the recommended hybrid setup (game audio output through your PC speakers/headphones via WASAPI at 48000 Hz, and low-latency guitar input via ASIO from the Spark 2):
 
 ```ini
 [Config]
@@ -154,34 +156,34 @@ SoftwareMasterVolumePercent=2000
 EnableRefCountHack=
 ```
 
-> **Nota**: Si prefieres escuchar el sonido del juego a través de los altavoces del propio **Spark 2** en lugar del PC, cambia `EnableWasapiOutputs=0` y pon `Driver=Positive Grid USB Audio Device` debajo de `[Asio.Output]`.
+> **Note**: If you prefer routing game audio output through the **Spark 2** speakers instead of your PC soundcard, set `EnableWasapiOutputs=0` and set `Driver=Positive Grid USB Audio Device` under `[Asio.Output]`.
 
 ---
 
-## 4. Puesta en marcha y diagnóstico (`RS_ASIO-log.txt`)
+## 4. In-Game Setup & Diagnostics (`RS_ASIO-log.txt`)
 
-1. Dentro de Rocksmith 2014, asegúrate de tener seleccionado el modo de entrada **Real Tone Cable** (no Micrófono).
-2. Entra en **Calibración** y sigue las instrucciones rasgueando las cuerdas.
-3. Si abres `RS_ASIO-log.txt` en la carpeta del juego, verás que:
-   - El driver arranca en modo remuestreo en tiempo real:
+1. Launch Rocksmith 2014 and make sure your input mode is set to **Real Tone Cable** (not Microphone).
+2. Run **Calibration** inside the game.
+3. If you inspect `RS_ASIO-log.txt` in the game folder, you will see:
+   - Real-time resampling automatically engaged:
      ```txt
      ASIO running at 44100 Hz (host format is 48000 Hz - real-time resampling enabled)
      {ASIO IN 0} Initialize - real-time resampling active: ASIO 44100Hz (128 frames) <-> Host 48000Hz (up to 140 frames)
      ```
-   - La ganancia de calibración de Rocksmith (`fLevel`) se estabiliza cómodamente hacia la mitad de la escala (`fLevel ≈ 0.45 - 0.65`).
-   - Las líneas `[InputMeter]` muestran los picos de tu guitarra:
-     - En silencio: `rawPeak ≈ 0.00005` (`outPeak ≈ 0.0005`, `-66 dBFS`).
-     - Rasgueando fuerte: `outPeak ≈ 0.60 - 0.90` (fuerte y claro, sin llegar a `1.0`).
-   - **Ajuste fino según tus pastillas**:
-     - Si tu guitarra tiene pastillas de salida muy baja y en la calibración `fLevel` se queda clavado en `1`, sube `SoftwareMasterVolumePercent` a `2500` o `3000`.
-     - Si tu guitarra tiene pastillas activas muy potentes y `outPeak` llega a `1` constantemente, baja `SoftwareMasterVolumePercent` a `1200` o `1500`.
+   - Rocksmith's internal input gain (`fLevel`) settling right in the middle of the range (`fLevel ≈ 0.45 - 0.65`).
+   - Periodic `[InputMeter]` entries showing your guitar signal peaks:
+     - Silence noise floor: `rawPeak ≈ 0.00005` (`outPeak ≈ 0.0005`, `-66 dBFS`).
+     - Heavy strumming during calibration: `outPeak ≈ 0.60 - 0.90` (strong signal with zero clipping below `1.0`).
+   - **Fine-tuning for different guitar pickups**:
+     - If you use very low-output vintage single-coils and `fLevel` stays pinned at `1` during calibration, increase `SoftwareMasterVolumePercent` to `2500` or `3000`.
+     - If you use high-output active pickups and `outPeak` frequently hits `1`, lower `SoftwareMasterVolumePercent` to `1200` or `1500`.
 
 ---
 
-## Desinstalación
+## Uninstallation
 
-Para desinstalar `RS_ASIO`, simplemente elimina `RS_ASIO.dll`, `avrt.dll` y `RS_ASIO.ini` de la carpeta de `Rocksmith2014`.
+To remove `RS_ASIO`, simply delete `RS_ASIO.dll`, `avrt.dll`, and `RS_ASIO.ini` from your `Rocksmith2014` folder.
 
-## Créditos
+## Credits
 
-Basado en el proyecto original **[RS_ASIO](https://github.com/mdias/rs_asio)** creado por **[mdias](https://github.com/mdias)** y colaboradores.
+Based on the original **[RS_ASIO](https://github.com/mdias/rs_asio)** project created by **[mdias](https://github.com/mdias)** and contributors.
