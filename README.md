@@ -120,7 +120,7 @@ Before launching the game, verify these 3 settings:
 
 This version solves those limitations out of the box:
 
-1. **Automatic `44100 Hz` Fallback**: When the ASIO driver rejects `48000 Hz`, `RS_ASIO` automatically falls back to `44100 Hz`.
+1. **Automatic Sample-Rate Fallback (`getSampleRate`)**: When the ASIO driver rejects `48000 Hz`, `RS_ASIO` automatically queries the driver's current sample rate (e.g. `44100 Hz` on the Spark 2, or `88200` / `96000 Hz` on other interfaces) and engages real-time resampling.
 2. **Real-Time Continuous-Phase Resampling (`44100 Hz ↔ 48000 Hz`)**: Uses 4-point cubic Hermite interpolation (`step = 44100 / 48000 = 0.91875`), tuned for a **`128 samples` ASIO buffer on Windows** (~2.9 ms ASIO latency → 139/140-frame blocks at 48000 Hz). Ensures rock-solid pitch detection in the tuner, across all 6 strings, and in fret-sensitive minigames like *Ducks Redux*.
 3. **Clean Software Pre-Gain (`SoftwareMasterVolumePercent=2000`) with Anti-Clipping Protection**: Boosts the pure 32-bit floating-point pickup signal by `20x` (bringing the `-27 dBFS` Spark 2 DI peak right into Rocksmith's optimal calibration sweet spot while clamping to `[-1.0, 1.0]` to prevent integer wrap-around or harsh digital clipping).
 4. **Built-in Signal Peak Meter (`[InputMeter]`)**: Logs raw (`rawPeak`) and post-gain (`outPeak`) guitar peak levels every ~3 seconds in `RS_ASIO-log.txt` while suppressing repeated `SetMasterVolumeLevelScalar` disk-flush spam during calibration.
