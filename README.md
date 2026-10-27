@@ -99,16 +99,17 @@ Write-Host "Successfully installed to $rsPath!" -ForegroundColor Green
 
 ---
 
-## 2. Required Settings (Windows & Spark 2)
+## 2. Optimal Settings (Windows & Spark 2: `44100 Hz` / `128 samples`)
 
 Before launching the game, verify these 3 settings:
 
-1. **Positive Grid Windows ASIO Driver set to `128 samples`**:
+1. **Positive Grid Windows ASIO Driver set to `44100 Hz` and `128 samples`**:
    - Install the official **Positive Grid USB Audio Device** driver for Windows.
-   - Open the **Positive Grid ASIO Control Panel** in Windows and set **`Buffer Size: 128 samples`**.
+   - Open the **Positive Grid ASIO Control Panel** in Windows (with Rocksmith closed) and set **`Buffer Size: 128 samples`** (sample rate is locked at **`44100 Hz`** by the Spark 2 hardware).
+   - *Why `128 samples`?* The official **Ubisoft Real Tone Cable** operates in WASAPI Exclusive mode with a **`3.0 ms` (`144 samples` at `48000 Hz`)** capture buffer, while Rocksmith's internal audio engine ticks every **`128 samples` (`2.67 ms`)**. At **`44100 Hz`**, a **`128 samples`** ASIO buffer corresponds to **`2.90 ms`** (`139–140 resampled frames` at `48000 Hz`), matching the native Real Tone Cable block size and timing almost 1:1. Using much larger buffers such as `512 samples` (`11.6 ms` / `558 frames`) delivers 4× larger bursts than Rocksmith's `3 ms` input period, causing pitch/fret detection errors (especially on the low 5th and 6th strings in fret-sensitive minigames like *Ducks Redux*).
 2. **Clean DI Signal on the Spark 2**:
-   - In the Spark mobile app (or by saving a clean hardware preset on the amp), **turn OFF all signal chain blocks**: `GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, and `REVERB`.
-   - *Why?* Rocksmith's pitch detector expects an unprocessed Direct Injection (DI) guitar signal (just like the official Real Tone Cable) and applies its own in-game amp modeling. Leaving the Spark's `AMP` block enabled introduces tube/cabinet harmonic overtones that trick Rocksmith into detecting notes an octave (+12 frets) higher.
+   - In the Spark mobile app (or by saving a clean hardware preset on the amp by holding the Preset button), **turn OFF all signal chain blocks**: `GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, and `REVERB`.
+   - *Why?* Rocksmith's pitch detector expects an unprocessed Direct Injection (DI) guitar signal (just like the official Real Tone Cable) and applies its own in-game amp modeling. Leaving the Spark's `AMP` or `COMP` blocks enabled introduces harmonic overtones that trick Rocksmith into detecting notes an octave (+12 frets) or several frets higher. *(Remember: if you power-cycle the Spark 2 without saving the bypassed preset to a hardware slot, the amp will boot back into its stored preset with effects enabled).*
 3. **Guitar Volume Knob at 100%**:
    - Turn your guitar's physical volume knob all the way up. *(Note: when the `AMP` block is bypassed on the Spark 2, the physical `MASTER` / `OUTPUT` knobs on the amp only control room speaker volume and do not affect the USB audio send level).*
 
@@ -123,7 +124,7 @@ This version solves those limitations out of the box:
 1. **Automatic Sample-Rate Fallback (`getSampleRate`)**: When the ASIO driver rejects `48000 Hz`, `RS_ASIO` automatically queries the driver's current sample rate (e.g. `44100 Hz` on the Spark 2, or `88200` / `96000 Hz` on other interfaces) and engages real-time resampling.
 2. **Real-Time Continuous-Phase Resampling (`44100 Hz ↔ 48000 Hz`)**: Uses 4-point cubic Hermite interpolation (`step = 44100 / 48000 = 0.91875`), tuned for a **`128 samples` ASIO buffer on Windows** (~2.9 ms ASIO latency → 139/140-frame blocks at 48000 Hz). Ensures rock-solid pitch detection in the tuner, across all 6 strings, and in fret-sensitive minigames like *Ducks Redux*.
 3. **Clean Software Pre-Gain (`SoftwareMasterVolumePercent=2000`) with Anti-Clipping Protection**: Boosts the pure 32-bit floating-point pickup signal by `20x` (bringing the `-27 dBFS` Spark 2 DI peak right into Rocksmith's optimal calibration sweet spot while clamping to `[-1.0, 1.0]` to prevent integer wrap-around or harsh digital clipping).
-4. **Built-in Signal Peak Meter (`[InputMeter]`)**: Logs raw (`rawPeak`) and post-gain (`outPeak`) guitar peak levels every ~3 seconds in `RS_ASIO-log.txt` while suppressing repeated `SetMasterVolumeLevelScalar` disk-flush spam during calibration.
+4. **Zero-Stutter Real-Time Audio Callback**: Suppresses repeated `SetMasterVolumeLevelScalar` disk-flush spam during calibration and avoids any disk I/O inside the real-time ASIO buffer switch callback.
 
 ---
 
@@ -169,18 +170,15 @@ EnableRefCountHack=
 1. Launch Rocksmith 2014 and make sure your input mode is set to **Real Tone Cable** (not Microphone).
 2. Run **Calibration** inside the game.
 3. If you inspect `RS_ASIO-log.txt` in the game folder, you will see:
-   - Real-time resampling automatically engaged:
+   - Real-time resampling automatically engaged at **`44100 Hz` (`128 frames`)**:
      ```txt
      ASIO running at 44100 Hz (host format is 48000 Hz - real-time resampling enabled)
      {ASIO IN 0} Initialize - real-time resampling active: ASIO 44100Hz (128 frames) <-> Host 48000Hz (up to 140 frames)
      ```
    - Rocksmith's internal input gain (`fLevel`) settling right in the middle of the range (`fLevel ≈ 0.45 - 0.65`).
-   - Periodic `[InputMeter]` entries showing your guitar signal peaks:
-     - Silence noise floor: `rawPeak ≈ 0.00005` (`outPeak ≈ 0.0005`, `-66 dBFS`).
-     - Heavy strumming during calibration: `outPeak ≈ 0.60 - 0.90` (strong signal with zero clipping below `1.0`).
-   - **Fine-tuning for different guitar pickups**:
+   - **Fine-tuning `SoftwareMasterVolumePercent` for different guitar pickups**:
      - If you use very low-output vintage single-coils and `fLevel` stays pinned at `1` during calibration, increase `SoftwareMasterVolumePercent` to `2500` or `3000`.
-     - If you use high-output active pickups and `outPeak` frequently hits `1`, lower `SoftwareMasterVolumePercent` to `1200` or `1500`.
+     - If you use high-output humbuckers/active pickups (or notice that hard picking on the heavy 5th/6th strings causes a momentary `+1 fret` pitch spike), lower `SoftwareMasterVolumePercent` to `1000`–`1500`.
 
 ---
 
