@@ -85,6 +85,11 @@ $tempZip = Join-Path $env:TEMP "RS_ASIO-spark2.zip"
 Invoke-WebRequest -Uri $releaseUrl -OutFile $tempZip -UseBasicParsing
 Expand-Archive -Path $tempZip -DestinationPath $rsPath -Force
 Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
+if ((Test-Path "HKLM:\SOFTWARE\WOW6432Node\ASIO\Positive Grid USB Audio Device") -or (Test-Path "HKLM:\SOFTWARE\ASIO\Positive Grid USB Audio Device")) {
+    Write-Host "[OK] Positive Grid USB Audio Device ASIO driver detected." -ForegroundColor Green
+} else {
+    Write-Host "[WARN] Positive Grid Windows ASIO driver not detected yet. Please install it from Positive Grid Help Center." -ForegroundColor Yellow
+}
 Write-Host "Successfully installed to $rsPath!" -ForegroundColor Green
 ```
 
@@ -149,12 +154,12 @@ This version solves those limitations out of the box:
 
 ## 4. Included `RS_ASIO.ini` Configuration
 
-The preconfigured `RS_ASIO.ini` included in the release uses the recommended hybrid setup (game audio output through your PC speakers/headphones via WASAPI at 48000 Hz, and low-latency guitar input via ASIO from the Spark 2):
+The preconfigured `RS_ASIO.ini` included in the release uses the recommended hybrid setup (game audio output through your PC speakers/headphones via WASAPI at 48000 Hz, low-latency guitar input via ASIO from the Spark 2, and `EnableWasapiInputs=1` so an official Real Tone Cable also works natively whenever the Spark 2 is powered off/unplugged):
 
 ```ini
 [Config]
 EnableWasapiOutputs=1
-EnableWasapiInputs=0
+EnableWasapiInputs=1
 EnableAsio=1
 
 [Asio]

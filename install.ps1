@@ -98,7 +98,27 @@ Write-Host "[..] Extracting RS_ASIO.dll, avrt.dll, and RS_ASIO.ini..." -Foregrou
 Expand-Archive -Path $tempZip -DestinationPath $rsPath -Force
 Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
 
-# 4. Verify ExclusiveMode=1 and Win32UltraLowLatencyMode=1 in Rocksmith.ini
+# 4. Verify Positive Grid USB Audio Device ASIO driver in Windows Registry
+$asioRegPaths = @(
+    "HKLM:\SOFTWARE\WOW6432Node\ASIO\Positive Grid USB Audio Device",
+    "HKLM:\SOFTWARE\ASIO\Positive Grid USB Audio Device"
+)
+$pgAsioFound = $false
+foreach ($ap in $asioRegPaths) {
+    if (Test-Path $ap) {
+        $pgAsioFound = $true
+        break
+    }
+}
+if ($pgAsioFound) {
+    Write-Host "[OK] Positive Grid USB Audio Device ASIO driver detected in Windows Registry." -ForegroundColor Green
+} else {
+    Write-Host "[WARN] 'Positive Grid USB Audio Device' ASIO driver was not found in the Windows Registry." -ForegroundColor Yellow
+    Write-Host "       Please install the official Positive Grid Windows USB Audio driver from:" -ForegroundColor Yellow
+    Write-Host "       https://help.positivegrid.com/hc/en-us/articles/8140276955917" -ForegroundColor White
+}
+
+# 5. Verify ExclusiveMode=1 and Win32UltraLowLatencyMode=1 in Rocksmith.ini
 $rsIni = Join-Path $rsPath "Rocksmith.ini"
 if (Test-Path $rsIni) {
     $iniContent = Get-Content $rsIni -Raw
