@@ -107,6 +107,25 @@ Before launching the game, verify these 3 settings:
    - Install the official **Positive Grid USB Audio Device** driver for Windows.
    - Open the **Positive Grid ASIO Control Panel** in Windows (with Rocksmith closed) and set **`Buffer Size: 128 samples`** (sample rate is locked at **`44100 Hz`** by the Spark 2 hardware).
    - *Why `128 samples`?* The official **Ubisoft Real Tone Cable** operates in WASAPI Exclusive mode with a **`3.0 ms` (`144 samples` at `48000 Hz`)** capture buffer, while Rocksmith's internal audio engine ticks every **`128 samples` (`2.67 ms`)**. At **`44100 Hz`**, a **`128 samples`** ASIO buffer corresponds to **`2.90 ms`** (`139–140 resampled frames` at `48000 Hz`), matching the native Real Tone Cable block size and timing almost 1:1. Using much larger buffers such as `512 samples` (`11.6 ms` / `558 frames`) delivers 4× larger bursts than Rocksmith's `3 ms` input period, causing pitch/fret detection errors (especially on the low 5th and 6th strings in fret-sensitive minigames like *Ducks Redux*).
+
+### Optimal Buffer Size by Sample Rate (For Other USB Amplifiers & Interfaces)
+
+To match the **`~2.67 ms – 3.00 ms` (`128 – 144 frames` at `48000 Hz`)** capture window expected by Rocksmith 2014's pitch detector across any ASIO sample rate ($\text{Optimal Buffer} \approx \text{SampleRate} \times 0.0029$), use the following settings:
+
+| ASIO Driver Sample Rate | Optimal ASIO `Buffer Size` | Block Duration | Frames Delivered to Rocksmith (`48000 Hz`) | `RS_ASIO.ini` Setting | Common Amplifiers / Interfaces |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| *(Real Tone Cable — WASAPI)* | *`144 samples` (fixed)* | *`3.00 ms`* | *`144 frames` (native reference)* | *`EnableWasapiInputs=1`* | *Ubisoft Real Tone Cable* |
+| **`44100 Hz`** | **`128 samples`** | **`2.90 ms`** | **`139–140 frames`** (Resampled) | `ResamplingMode=Auto` | Positive Grid Spark 2 / 40 / MINI / GO, Boss Katana, Yamaha THR |
+| **`48000 Hz`** | **`128 samples`** *(or `144`)* | **`2.67 ms`** *(or `3.00 ms`)* | **`128 frames`** *(or `144`)* (Native 1:1) | `ResamplingMode=Auto` | Focusrite Scarlett, Steinberg UR, Behringer UMC, Line 6 Helix |
+| **`88200 Hz`** | **`256 samples`** | **`2.90 ms`** | **`139–140 frames`** (Resampled) | `ResamplingMode=Auto` *(or `Always`)* | Interfaces running at `2× 44.1 kHz` |
+| **`96000 Hz`** | **`256 samples`** | **`2.67 ms`** | **`128 frames`** (Resampled) | `ResamplingMode=Auto` *(or `Always`)* | Interfaces running at `2× 48 kHz` |
+| **`176400 Hz`** | **`512 samples`** | **`2.90 ms`** | **`139–140 frames`** (Resampled) | `ResamplingMode=Auto` *(or `Always`)* | Interfaces running at `4× 44.1 kHz` |
+| **`192000 Hz`** | **`512 samples`** | **`2.67 ms`** | **`128 frames`** (Resampled) | `ResamplingMode=Auto` *(or `Always`)* | Interfaces running at `4× 48 kHz` |
+
+> **General Tips for Other USB Modeling Amplifiers (Boss Katana, Yamaha THR, Fender Mustang, Line 6, etc.):**
+> - **Use a Clean DI Signal**: If your amp exposes a dedicated **Dry / DI** USB input channel (commonly `Channel=2` or `Channel=3` on Boss Katana / Yamaha THR), set `Channel=` to that DI channel in `[Asio.Input.0]`. If your amp sends the processed signal chain over `Channel=0` (like the **Positive Grid Spark 2 / Spark 40**), save a hardware preset with all amp/effect blocks (`GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, `REVERB`) turned **OFF**.
+> - **Adjust Digital Pre-Gain (`SoftwareMasterVolumePercent`)**: Standard `0 dB` interfaces use `SoftwareMasterVolumePercent=100`. USB modeling amps that output a conservative DI signal (`-24 dBFS` to `-30 dBFS`, like the Spark 2) should use `SoftwareMasterVolumePercent=1000` to `2000` (`+20 dB` to `+26 dB`) so Rocksmith's calibration `fLevel` settles around `0.45 – 0.65`.
+> - **Using Both an ASIO Amp and the Official Real Tone Cable**: Set `EnableWasapiInputs=1` under `[Config]` in `RS_ASIO.ini`. When your ASIO amp is powered off or unplugged from USB, `RS_ASIO` will automatically fall back to your native WASAPI **Real Tone Cable** without needing to remove `RS_ASIO.dll` or `avrt.dll`.
 2. **Clean DI Signal on the Spark 2**:
    - In the Spark mobile app (or by saving a clean hardware preset on the amp by holding the Preset button), **turn OFF all signal chain blocks**: `GATE`, `COMP`, `DRIVE`, `AMP`, `MOD`, `DELAY`, and `REVERB`.
    - *Why?* Rocksmith's pitch detector expects an unprocessed Direct Injection (DI) guitar signal (just like the official Real Tone Cable) and applies its own in-game amp modeling. Leaving the Spark's `AMP` or `COMP` blocks enabled introduces harmonic overtones that trick Rocksmith into detecting notes an octave (+12 frets) or several frets higher. *(Remember: if you power-cycle the Spark 2 without saving the bypassed preset to a hardware slot, the amp will boot back into its stored preset with effects enabled).*
@@ -121,7 +140,7 @@ Before launching the game, verify these 3 settings:
 
 This version solves those limitations out of the box:
 
-1. **Automatic Sample-Rate Fallback (`getSampleRate`)**: When the ASIO driver rejects `48000 Hz`, `RS_ASIO` automatically queries the driver's current sample rate (e.g. `44100 Hz` on the Spark 2, or `88200` / `96000 Hz` on other interfaces) and engages real-time resampling.
+1. **Configurable `ResamplingMode` (`Auto`, `Always`, `Disabled`)**: With `ResamplingMode=Auto` (default), `RS_ASIO` attempts to switch the ASIO driver to `48000 Hz` first and automatically falls back to the driver's current sample rate via `getSampleRate` (e.g. `44100 Hz` on the Spark 2, or `88200` / `96000 Hz` on other interfaces) with real-time resampling. `ResamplingMode=Always` resamples on the fly without attempting to switch the driver's sample rate, and `ResamplingMode=Disabled` disables on-the-fly resampling.
 2. **Real-Time Continuous-Phase Resampling (`44100 Hz ↔ 48000 Hz`)**: Uses 4-point cubic Hermite interpolation (`step = 44100 / 48000 = 0.91875`), tuned for a **`128 samples` ASIO buffer on Windows** (~2.9 ms ASIO latency → 139/140-frame blocks at 48000 Hz). Ensures rock-solid pitch detection in the tuner, across all 6 strings, and in fret-sensitive minigames like *Ducks Redux*.
 3. **Clean Software Pre-Gain (`SoftwareMasterVolumePercent=2000`) with Anti-Clipping Protection**: Boosts the pure 32-bit floating-point pickup signal by `20x` (bringing the `-27 dBFS` Spark 2 DI peak right into Rocksmith's optimal calibration sweet spot while clamping to `[-1.0, 1.0]` to prevent integer wrap-around or harsh digital clipping).
 4. **Zero-Stutter Real-Time Audio Callback**: Suppresses repeated `SetMasterVolumeLevelScalar` disk-flush spam during calibration and avoids any disk I/O inside the real-time ASIO buffer switch callback.
@@ -141,7 +160,7 @@ EnableAsio=1
 [Asio]
 BufferSizeMode=driver
 CustomBufferSize=
-SampleRate=
+ResamplingMode=Auto
 
 [Asio.Output]
 Driver=
